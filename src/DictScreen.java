@@ -78,8 +78,7 @@ public class DictScreen extends Canvas implements CommandListener, DictTextForma
     boolean cursorBlinkVisible = false;
     int searchTimerCycle = -1;
     int textTimerCycle = -1;
-	
-	Font editFont = Font.getFont(Font.FACE_PROPORTIONAL, Font.STYLE_BOLD,Font.SIZE_LARGE);
+	Font editFont = Font.getFont(Font.FACE_PROPORTIONAL, Font.STYLE_BOLD, Font.SIZE_LARGE);
 	Font listFont = Font.getFont(Font.FACE_PROPORTIONAL, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
 	Font textFont = Font.getFont(Font.FACE_PROPORTIONAL, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
 	Font headerFont = Font.getFont(Font.FACE_PROPORTIONAL, Font.STYLE_BOLD, Font.SIZE_MEDIUM);
@@ -99,7 +98,11 @@ public class DictScreen extends Canvas implements CommandListener, DictTextForma
 	int textGap3 = textGap * 3;
 	int textGap4 = textGap * 4;
 	int listWidth;
-	
+
+	//unicode characters for QWERTY keyboards
+	private static final int BACKSPACE = 8;
+	private static final int ENTER = 10;
+
 	DictScreen(Dictionary p) {
 		app = p;
 		for (int i = 0; i < MAX_WORD_COUNT; i ++) {
@@ -302,30 +305,51 @@ public class DictScreen extends Canvas implements CommandListener, DictTextForma
     
     private boolean editKeyPressed(int key) {
         String ch;
-        if (key > KEY_NUM9 || key < KEY_NUM0) return false;
-        state = EDITING;
-        cursorBlinkVisible = true;
-        ch = keyMap[key - KEY_NUM0];
-        if ((lastKeyChars == null) || (lastKeyChars != ch)) {
-            stopTextTimer();
-            keyCharIndex = 0;
-            lastKeyChars = ch;
-        } else {
-            if (keyCharIndex >= (lastKeyChars.length() - 1)) keyCharIndex = 0;
-            else keyCharIndex++;
-        }
+		char sch;
 
-        if (textTimerCycle== -1) text.append((char) 0);
-        char sch = lastKeyChars.charAt(keyCharIndex);
-        text.setByte(text.size() - 1, sch);
-        if (!Bytes.isWordChar(sch)) {
-        	int word = text.wordCount();
-        	lookupList(word - 2);
-        }
-        lookupList(-2);
-        startTextTimer();
-        return true;
-    }
+		if (key < 0 || key == KEY_POUND || key == KEY_STAR || key == BACKSPACE || key==ENTER) {
+			return false;
+		}
+
+		state = EDITING;
+		cursorBlinkVisible = true;
+
+		if (key <= KEY_NUM9 && key >= KEY_NUM0) {
+			ch = keyMap[key - KEY_NUM0];
+
+			if ((lastKeyChars == null) || (lastKeyChars != ch)) {
+				stopTextTimer();
+				keyCharIndex = 0;
+				lastKeyChars = ch;
+			} else {
+				if (keyCharIndex >= (lastKeyChars.length() - 1)) {
+					keyCharIndex = 0;
+				} else {
+					keyCharIndex++;
+				}
+			}
+
+			if (textTimerCycle == -1) {
+				text.append((char) 0);
+			}
+			sch = lastKeyChars.charAt(keyCharIndex);
+			text.setByte(text.size() - 1, sch);
+		} else { //a QWERTY keyboard character
+			lastKeyChars = null;
+			stopTextTimer();
+
+			sch=(char) key;
+			text.append(sch);
+		}
+
+		if (!Bytes.isWordChar(sch)) {
+			int word = text.wordCount();
+			lookupList(word - 2);
+		}
+		lookupList(-2);
+		startTextTimer();
+		return true;
+	}
 
     void textDelete() {
         cursorBlinkVisible = true;
@@ -374,22 +398,20 @@ public class DictScreen extends Canvas implements CommandListener, DictTextForma
 		}
 		
 	}
-    
+
 	protected final void keyPressed(int key) {
 		int gKey = getGameAction(key);
-		
-		if (state == BROWSING ) {
-			if (editKeyPressed(key)) {
 
-			}else if (key == KEY_STAR) {
+		if (state == BROWSING) {
+			if (editKeyPressed(key)) {
+			} else if (key == KEY_STAR) {
 				clear();
-			} else 	if (key == -8) {
+			} else if (key == -8) {
 				textDelete();
 			} else if (key == KEY_POUND) {
 				state = EDITING;
 			} else if (resultViewKeyPressed(gKey)) {
-
-			} else if (gKey == FIRE) {
+			} else if (gKey == FIRE || key==ENTER) {
 				text.replace(resultView.getHyperlink());
 				text.toLowerCase();
 				updateAllLookups();
@@ -398,10 +420,9 @@ public class DictScreen extends Canvas implements CommandListener, DictTextForma
 
 		} else if (state == EDITING) {
 			if (editKeyPressed(key)) {
-
-			}else if (key == KEY_STAR) {
+			} else if (key == KEY_STAR) {
 				clear();
-			} else if (key == -8 || gKey == LEFT) {
+			} else if (key == -8 || gKey == LEFT || key == BACKSPACE) {
 				textDelete();
 			} else if (gKey == DOWN) {
 				dictReader.next();
@@ -411,18 +432,18 @@ public class DictScreen extends Canvas implements CommandListener, DictTextForma
 				dictReader.previous();
 				listUpdateEdit();
 				startSearchTimer();
-			} else if (gKey == FIRE) {
+			} else if (gKey == FIRE || key==ENTER) {
 				search(true);
 			}
-			
-		} else 	if (state == HELP) {
+
+		} else if (state == HELP) {
 			resultViewKeyPressed(gKey);
 		} else {
 			return;
 		}
-		updateCommands ();
+		updateCommands();
 		repaint();
-    }
+	}
 
     protected void keyRepeated(int key) {
     	this.keyPressed(key);
